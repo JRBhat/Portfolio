@@ -7,3 +7,5 @@ Log 1: Files contain scripts pertaining to personal projects and assignment solu
 
 R sub-folder:
 Log 1: Files contain scripts to generate forecasts and check their accuracy on different time series datasets using the R's forecast package.
+
+More uploads are expected soon.
