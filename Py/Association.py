@@ -1,8 +1,11 @@
+# This program enables the user to take a psycological test to check his/her association capabilities.
+# The user is presented with a word of a certain color('red', 'blue', 'green', 'pink'), and then asked to identify the color of this word. 
+# The colour of the word and the word itself do not necessarily match
+
 import random
 import time
 
-PHASE_TIME_S = 10
-
+PHASE_TIME_S = 10 # 10 second per phase (pahse 1: control group and pahse 2: experimental group)
 
 def main():
     is_phase_1 = True
@@ -13,7 +16,6 @@ def main():
     count_2 = run_phase(is_phase_1)
     print(f"Total correct in Phase 1 : {count_1}")
     print(f"Total correct in Phase 2 : {count_2}")
-
 
 def print_intro(is_phase_1):
     # greets the user and displays the different choices at his disposal
