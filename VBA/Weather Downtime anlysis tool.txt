@@ -1,0 +1,252 @@
+Sub hyndcast()
+Application.Calculation = xlCalculationManual
+Application.ScreenUpdating = False
+Call Frmtcutcopytime
+Range("C1").Select
+Range(Selection, Selection.End(xlDown)).Select
+Call ww
+Call per1
+Call per2
+Call per3
+Call per4
+Call per5
+Call per6
+Call color
+Call colorww
+Application.Calculation = xlCalculationAutomatic
+Application.ScreenUpdating = True
+End Sub
+Sub ww()
+Dim i As Integer, nr As Integer
+nr = Selection.Rows.Count
+For i = 1 To nr
+    If Cells(i, 3).Value < 1.5 Then
+        Cells(i, 4).Value = "W"
+    Else: Cells(i, 4).Value = "D"
+    End If
+Next i
+End Sub
+
+Sub per1()
+Dim i As Integer, nr As Integer
+nr = Selection.Rows.Count
+For i = 1 To nr
+    If Cells(i, 4).Value = "W" Then
+        Cells(i, 5).Value = 1
+    Else: Cells(i, 5).Value = 0
+    End If
+Next i
+End Sub
+
+Sub per2()
+Dim i As Integer, nr As Integer
+nr = Selection.Rows.Count
+For i = 1 To nr
+    If Cells(i, 4).Value = "W" Then
+        Cells(i, 6).Value = 1
+        Cells(i + 1, 6).Value = 2
+        i = i + 1
+        If Cells(i, 4).Value = "D" Then
+            Cells(i, 6).Value = 0
+            i = i - 1
+        End If
+        Else: Cells(i, 6).Value = 0
+    End If
+Next i
+End Sub
+Sub per3()
+Dim i As Integer, nr As Integer
+nr = Selection.Rows.Count
+For i = 1 To nr
+    If Cells(i, 4).Value = "W" Then
+        Cells(i, 7).Value = 1
+        Cells(i + 1, 7).Value = 2
+        Cells(i + 2, 7).Value = 3
+        i = i + 2
+        If Cells(i - 1, 4).Value = "D" Then
+            Cells(i - 1, 7).Value = 0
+            i = i - 1
+        End If
+        If Cells(i, 4).Value = "D" Then
+            Cells(i, 7).Value = 0
+            i = i - 1
+        End If
+    Else: Cells(i, 7).Value = 0
+    End If
+Next i
+End Sub
+Sub per4()
+Dim i As Integer, nr As Integer
+nr = Selection.Rows.Count
+For i = 1 To nr
+    If Cells(i, 4).Value = "W" Then
+        Cells(i, 8).Value = 1
+        Cells(i + 1, 8).Value = 2
+        Cells(i + 2, 8).Value = 3
+        Cells(i + 3, 8).Value = 4
+        i = i + 3
+        If Cells(i - 2, 4).Value = "D" Then
+            Cells(i - 2, 8).Value = 0
+            i = i - 1
+        End If
+        If Cells(i - 1, 4).Value = "D" Then
+            Cells(i - 1, 8).Value = 0
+            i = i - 1
+        End If
+        If Cells(i, 4).Value = "D" Then
+            Cells(i, 8).Value = 0
+            i = i - 1
+        End If
+    Else: Cells(i, 8).Value = 0
+    End If
+Next i
+End Sub
+Sub per5()
+Dim i As Integer, nr As Integer
+nr = Selection.Rows.Count
+For i = 1 To nr
+    If Cells(i, 4).Value = "W" Then
+        Cells(i, 9).Value = 1
+        Cells(i + 1, 9).Value = 2
+        Cells(i + 2, 9).Value = 3
+        Cells(i + 3, 9).Value = 4
+        Cells(i + 4, 9).Value = 5
+        i = i + 4
+        If Cells(i - 3, 4).Value = "D" Then
+            Cells(i - 3, 9).Value = 0
+            i = i - 1
+        End If
+        If Cells(i - 2, 4).Value = "D" Then
+            Cells(i - 2, 9).Value = 0
+            i = i - 1
+        End If
+        If Cells(i - 1, 4).Value = "D" Then
+            Cells(i - 1, 9).Value = 0
+            i = i - 1
+        End If
+        If Cells(i, 4).Value = "D" Then
+            Cells(i, 9).Value = 0
+            i = i - 1
+        End If
+    Else: Cells(i, 9).Value = 0
+    End If
+Next i
+End Sub
+
+Sub per6()
+Dim i As Integer, nr As Integer
+nr = Selection.Rows.Count
+For i = 1 To nr
+    If Cells(i, 4).Value = "W" Then
+        Cells(i, 10).Value = 1
+        Cells(i + 1, 10).Value = 2
+        Cells(i + 2, 10).Value = 3
+        Cells(i + 3, 10).Value = 4
+        Cells(i + 4, 10).Value = 5
+        Cells(i + 5, 10).Value = 6
+        i = i + 5
+        If Cells(i - 4, 4).Value = "D" Then
+            Cells(i - 4, 10).Value = 0
+            i = i - 1
+        End If
+        If Cells(i - 3, 4).Value = "D" Then
+            Cells(i - 3, 10).Value = 0
+            i = i - 1
+        End If
+        If Cells(i - 2, 4).Value = "D" Then
+            Cells(i - 2, 10).Value = 0
+            i = i - 1
+        End If
+        If Cells(i - 1, 4).Value = "D" Then
+            Cells(i - 1, 10).Value = 0
+            i = i - 1
+        End If
+        If Cells(i, 4).Value = "D" Then
+            Cells(i, 10).Value = 0
+            i = i - 1
+        End If
+    Else: Cells(i, 10).Value = 0
+    End If
+Next i
+End Sub
+
+Sub color()
+Range("E1").Select
+Range(Selection, Selection.End(xlToRight)).Select
+Range(Selection, Selection.End(xlDown)).Select
+
+Selection.FormatConditions.AddColorScale ColorScaleType:=3
+    Selection.FormatConditions(Selection.FormatConditions.Count).SetFirstPriority
+    Selection.FormatConditions(1).ColorScaleCriteria(1).Type = _
+        xlConditionValueLowestValue
+    With Selection.FormatConditions(1).ColorScaleCriteria(1).FormatColor
+        .color = 7039480
+        .TintAndShade = 0
+    End With
+    Selection.FormatConditions(1).ColorScaleCriteria(2).Type = _
+        xlConditionValuePercentile
+    Selection.FormatConditions(1).ColorScaleCriteria(2).Value = 50
+    With Selection.FormatConditions(1).ColorScaleCriteria(2).FormatColor
+        .color = 8711167
+        .TintAndShade = 0
+    End With
+    Selection.FormatConditions(1).ColorScaleCriteria(3).Type = _
+        xlConditionValueHighestValue
+    With Selection.FormatConditions(1).ColorScaleCriteria(3).FormatColor
+        .color = 8109667
+        .TintAndShade = 0
+    End With
+    
+End Sub
+
+Sub colorww()
+
+    Range("D1").Select
+    Range(Selection, Selection.End(xlDown)).Select
+    Selection.FormatConditions.Add Type:=xlCellValue, Operator:=xlEqual, _
+        Formula1:="=""D"""
+    Selection.FormatConditions(Selection.FormatConditions.Count).SetFirstPriority
+    With Selection.FormatConditions(1).Font
+        .color = -16383844
+        .TintAndShade = 0
+    End With
+    With Selection.FormatConditions(1).Interior
+        .PatternColorIndex = xlAutomatic
+        .color = 13551615
+        .TintAndShade = 0
+    End With
+    Selection.FormatConditions(1).StopIfTrue = False
+    Selection.FormatConditions.Add Type:=xlCellValue, Operator:=xlEqual, _
+        Formula1:="=""W"""
+    Selection.FormatConditions(Selection.FormatConditions.Count).SetFirstPriority
+    With Selection.FormatConditions(1).Font
+        .color = -16752384
+        .TintAndShade = 0
+    End With
+    With Selection.FormatConditions(1).Interior
+        .PatternColorIndex = xlAutomatic
+        .color = 13561798
+        .TintAndShade = 0
+    End With
+    Selection.FormatConditions(1).StopIfTrue = False
+End Sub
+
+Sub Frmtcutcopytime()
+
+    Columns("B:B").Select
+    Selection.Insert Shift:=xlToRight
+    Range("A1").Select
+    Range(Selection, Selection.End(xlDown)).Select
+    Selection.Copy
+    Selection.End(xlUp).Select
+    Range("B1").Select
+    ActiveSheet.Paste
+    Application.CutCopyMode = False
+    Selection.NumberFormat = "[$-x-systime]h:mm:ss AM/PM"
+    Range("A1").Select
+    Range(Selection, Selection.End(xlDown)).Select
+    Selection.NumberFormat = "m/d/yyyy"
+    Range("A1").Select
+    
+End Sub
+
