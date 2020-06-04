@@ -16,6 +16,7 @@ Call colorww
 Application.Calculation = xlCalculationAutomatic
 Application.ScreenUpdating = True
 End Sub
+
 Sub ww()
 Dim i As Integer, nr As Integer
 nr = Selection.Rows.Count
@@ -54,6 +55,7 @@ For i = 1 To nr
     End If
 Next i
 End Sub
+
 Sub per3()
 Dim i As Integer, nr As Integer
 nr = Selection.Rows.Count
@@ -75,6 +77,7 @@ For i = 1 To nr
     End If
 Next i
 End Sub
+
 Sub per4()
 Dim i As Integer, nr As Integer
 nr = Selection.Rows.Count
@@ -101,6 +104,7 @@ For i = 1 To nr
     End If
 Next i
 End Sub
+
 Sub per5()
 Dim i As Integer, nr As Integer
 nr = Selection.Rows.Count
@@ -196,7 +200,6 @@ Selection.FormatConditions.AddColorScale ColorScaleType:=3
         .color = 8109667
         .TintAndShade = 0
     End With
-    
 End Sub
 
 Sub colorww()
@@ -247,6 +250,5 @@ Sub Frmtcutcopytime()
     Range(Selection, Selection.End(xlDown)).Select
     Selection.NumberFormat = "m/d/yyyy"
     Range("A1").Select
-    
 End Sub
 
