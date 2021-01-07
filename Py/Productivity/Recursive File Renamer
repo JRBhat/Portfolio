@@ -1,0 +1,17 @@
+
+import os
+
+def main():
+    path = r"D:\20.0261-53_Slimming"
+   
+    for dirpath, dirs, files in os.walk(path):  
+        for filename in files:
+            if "S001" in filename:
+                oldfile = os.path.join(dirpath, filename)
+                # Set parameters for renaming filename
+                filename = filename.replace("S001", "S002", 1)
+                newfile = os.path.join(dirpath, filename)
+                os.rename(oldfile, newfile)
+            
+if __name__ == "__main__":
+    main()
