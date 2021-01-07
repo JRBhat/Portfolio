@@ -11,4 +11,4 @@ Files contain scripts to generate forecasts and check their accuracy on differen
 VBA sub folder:
 Files contain script that was used for a weather downtime analysis tool given large Metocean datasets
 
-More uploads coming soon...Staz tuned!
+More uploads coming soon...Stay tuned!
