@@ -1,0 +1,32 @@
+import shutil, os
+
+import PyPDF2
+from pathlib import Path
+
+
+def main():
+
+    p = Path('C:\\Coding_Projekts\\Projekt_2_PDFreader\\protokoll')# Folder where the files are located
+
+    target_file_list = os.listdir(p)
+    for file_name in target_file_list:
+
+        pdfFileObj = open('C:\\Coding_Projekts\\Projekt_2_PDFreader\\protokoll\\' + file_name, 'rb')
+        pdfReader = PyPDF2.PdfFileReader(pdfFileObj)
+        pageObj = pdfReader.getPage(0)
+        content = pageObj.extractText()
+        content_list = content.split("\n")
+        print(content_list)
+        print(type(content))
+        
+
+        for line in content_list:
+            if 'Study No' in line:
+                study_no = line[11:]
+                print(study_no)
+                break
+        
+        shutil.copy('C:\\Coding_Projekts\\Projekt_2_PDFreader\\protokoll\\'+ file_name, 'C:\\Coding_Projekts\\Projekt_2_PDFreader\\Edited\\'+ study_no +'__'+file_name )
+        pdfFileObj.close()
+if __name__ ==  "__main__":
+    main()
