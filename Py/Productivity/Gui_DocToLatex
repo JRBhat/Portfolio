@@ -1,0 +1,283 @@
+from docx import Document as dok
+from gooey import Gooey, GooeyParser
+
+
+@Gooey
+def main():
+    parser = GooeyParser(description="DocToLatex converter")
+    parser.add_argument(
+        "doc_file", help="The file you want to process", type=str, widget="FileChooser"
+    )
+    args = parser.parse_args()
+    doc_filename = args.doc_file
+    # specify the file to parse
+    document = dok(doc_filename)
+    tex_filename = str(doc_filename[:-5])
+    # collecting all paragraph objects
+    all_paragraphs = document.paragraphs
+    print("\n\nNo of paragraphs read: " + str(len(all_paragraphs)))
+
+    # Empty List for collecting each paragraph text generated from paragraphs objects
+    names_explanation_list = []
+
+    for num, para in enumerate(all_paragraphs, start=1):
+        if para.text == "":
+            continue
+        print(str(num) + "-" + para.text)
+        names_explanation_list.append(para.text)
+
+    # Reads text from each cell in each Table
+    all_tables = document.tables
+
+    # Create a dictionary for generating empty lists
+    #  indexing according to number of table objects stored in 'all_tables' variable
+    dict_table = {}
+
+    # Assiging read tables as dict value object to its respective key names in the dictionary
+    for obj_num, obj in enumerate(all_tables, start=1):
+        list_for_table = "table_" + str(obj_num) + "_list"
+
+        dict_table[list_for_table] = []
+        if obj_num == len(all_tables):
+            list_for_para = "table_" + str(obj_num) + "_para_list"
+            list_for_col = "table_" + str(obj_num) + "_col_1_para_list"
+            dict_table[list_for_para] = []
+            dict_table[list_for_col] = []
+
+    print("\n\nThe dictionary of table names contains the following elements")
+    print(dict_table)
+    print("\n\nNo of tables read: " + str(len(all_tables)))
+
+    # Accessing text from each cell in each table
+    for table_num, table in enumerate(all_tables, start=1):
+        for row in table.rows:
+            for cell in row.cells:
+                dict_table["table_" + str(table_num) + "_list"].append(cell.text)
+
+    for table_num, table in enumerate(all_tables, start=1):
+        if table_num == len(all_tables):
+            for row in table.rows:
+                for cell in row.cells:
+                    for para in cell.paragraphs:
+                        dict_table["table_" + str(table_num) + "_para_list"].append(
+                            para.text
+                        )
+                        if ":" in para.text or "=" not in para.text:
+                            dict_table[
+                                "table_" + str(table_num) + "_col_1_para_list"
+                            ].append(para.text)
+
+    ### Viewing list elements
+    print(names_explanation_list)
+    print(len(names_explanation_list))
+
+    for key, value in dict_table.items():
+        print("\n\n" + "List name:" + key, end="\n")
+        print(value)
+
+    key_list = list(dict_table.keys())
+    print("\n")
+    print("This is the key list")
+    print(key_list)
+
+    list_of_tables = key_list[0 : (len(key_list) - 2)]
+    table_X_para_list = key_list[-2]
+    table_X_col_1_para_list = key_list[-1]
+
+    # Removes spaces and null strings from the list
+    clean_table_X_col_1_para_list = clean_list(dict_table[table_X_col_1_para_list])
+    print()
+    print(clean_table_X_col_1_para_list)
+
+    # Removing title due to its non-iterative and standard nature
+    title = names_explanation_list.pop(0)
+
+    # List for separating headings and descriptions (belonging to tables only)
+    table_explanation_list = names_explanation_list[
+        (len(names_explanation_list) - (len(all_tables) * 2)) :
+    ]
+    print("\n")
+    print("The items for the table explanation are: ")
+    print(table_explanation_list)
+    print("\n")
+    print("The items for the names explanation list are: ")
+    print(names_explanation_list)
+
+    # Creating a new tex document and populating it with corresponding objects
+    with open(tex_filename + ".tex", "w") as TxF:
+        TxF.write("\\documentclass[a4paper, 12pt]{article}\n")
+        TxF.write("\\begin{document}\n")
+        TxF.write("\\section{" + escape_special_chars(title) + "}" + "\\" + "\n")
+
+        z = 0
+        while z < len(names_explanation_list):
+            if names_explanation_list[z] in table_explanation_list:
+                break
+            TxF.write(
+                "\\subsection{"
+                + escape_special_chars(names_explanation_list[z])
+                + "}\n"
+            )
+            TxF.write(escape_special_chars(names_explanation_list[z + 1]) + "\n")
+            z += 2
+
+        i = 0
+        j = 0
+        while i < len(table_explanation_list) and j < len(list_of_tables):
+            print("i starts with:" + str(i))
+            print("j starts with:" + str(j))
+            subsection_with_explanation(
+                TxF, table_explanation_list[i], table_explanation_list[i + 1]
+            )
+            table_description(
+                TxF,
+                dict_table[list_of_tables[j]],
+                dict_table[table_X_para_list],
+                clean_table_X_col_1_para_list,
+            )
+            j += 1
+            i += 2
+            print("j ends with:" + str(j))
+            print("i ends with:" + str(i))
+        TxF.write("\\thispagestyle{empty}\n")
+        TxF.write("\\end{document}\n")
+
+    print(
+        f"You will find the generated file in the same folder with the name {str(tex_filename)}"
+        + ".tex"
+    )
+
+
+def subsection_with_explanation(obj, Heading, Description):
+    """ Creates a subsection with a heading and paragraph from description """
+    obj.write("\subsubsection{" + escape_special_chars(Heading) + "}\n")
+    obj.write(escape_special_chars(Description) + "\n")
+
+
+def table_description(obj, table_list, table_para_list, table_col_para_list):
+    """Creates a description object using the elements read from the table.
+    It also creates an itemize Latex object for listing out table sub-elements"""
+
+    k = 0
+    obj.write("\\begin{description}\n")
+    while k < len(table_list):
+        if (
+            table_list[len(table_list) - 1]
+            and "=" in table_list[k + 1]
+            and ":" in table_list[k]
+        ):
+            obj.write(
+                "\\item["
+                + escape_special_chars(table_heading(table_col_para_list, k))
+                + "]\mbox{}\n"
+            )
+            obj.write(
+                escape_special_chars(table_subdescription(table_col_para_list, k))
+                + "\n"
+            )
+            new_list = itemize_function(table_para_list)
+            for para_item in new_list:
+                obj.write(para_item)
+        else:
+            obj.write(
+                "\\item["
+                + escape_special_chars(table_list[k])
+                + "]"
+                + escape_special_chars(table_list[k + 1])
+                + "\n"
+            )
+        k += 2
+    obj.write("\\end{description}" + "\n")
+
+
+def itemize_function(table_paragraph_list):
+    """A function that lists iterative table elements using the itemize function of latex"""
+    print(table_paragraph_list)
+    itemize_list = []
+    itemize_list.append("\\begin{itemize}\n")
+    while len(table_paragraph_list) > 0:
+        if "=" in table_paragraph_list[0]:
+            item_str = (
+                "\t" + "\\item " + escape_special_chars(table_paragraph_list[0]) + "\n"
+            )
+            itemize_list.append(item_str)
+            table_paragraph_list.pop(0)
+            print('"=" read: ')
+            print(table_paragraph_list)
+            if (len(table_paragraph_list) <= 0) or (":" in table_paragraph_list[0]):
+                print("loop broken!")
+                print(table_paragraph_list)
+                break
+        else:
+            table_paragraph_list.pop(0)
+
+    itemize_list.append("\\end{itemize}" + "\n")
+    return itemize_list
+
+
+def table_heading(col_1_para_list, num):
+    """Takes in the heading as a paragraph from the first column of the table and prints it out as Subsection title"""
+    return col_1_para_list[num]
+
+
+def table_subdescription(col_1_para_list, num):
+    """Takes in the description from the first column of the table and prits it out as Subsection description"""
+    return col_1_para_list[num + 1]
+
+
+def escape_special_chars(textWUnd):
+    """A function that adds a backshlash infront of latex special characters and escapes them"""
+    if "_" in textWUnd:
+        txt_split_1 = textWUnd.split("_")
+        txt_join_1 = "\\_ ".join(txt_split_1)
+        return txt_join_1
+    elif "&" in textWUnd:
+        txt_split_2 = textWUnd.split("&")
+        txt_join_2 = "\\& ".join(txt_split_2)
+        return txt_join_2
+    elif "$" in textWUnd:
+        txt_split_3 = textWUnd.split("$")
+        txt_join_3 = "\\$ ".join(txt_split_3)
+        return txt_join_3
+    elif "%" in textWUnd:
+        txt_split_4 = textWUnd.split("%")
+        txt_join_4 = "\\% ".join(txt_split_4)
+        return txt_join_4
+    elif "{" in textWUnd:
+        txt_split_5 = textWUnd.split("{")
+        txt_join_5 = "\\{ ".join(txt_split_5)
+        return txt_join_5
+    elif "}" in textWUnd:
+        txt_split_6 = textWUnd.split("}")
+        txt_join_6 = "\\} ".join(txt_split_6)
+        return txt_join_6
+    elif "#" in textWUnd:
+        txt_split_7 = textWUnd.split("#")
+        txt_join_7 = "\\# ".join(txt_split_7)
+        return txt_join_7
+    elif "~" in textWUnd:
+        txt_split_8 = textWUnd.split("~")
+        txt_join_8 = "\\textasciitilde ".join(txt_split_8)
+        return txt_join_8
+    elif "^" in textWUnd:
+        txt_split_9 = textWUnd.split("^")
+        txt_join_9 = "\\textasciicircum ".join(txt_split_9)
+        return txt_join_9
+    elif "\\" in textWUnd:
+        txt_split_10 = textWUnd.split("\\")
+        txt_join_10 = "\\textasciibackslash ".join(txt_split_10)
+        return txt_join_10
+    return textWUnd
+
+
+def clean_list(table_list):
+    """A function that takes in a list and removes spaces and null strings from the list"""
+    cl_list = []
+    for elem in table_list:
+        if elem != "" and elem != " ":
+            cl_list.append(elem)
+    return cl_list
+
+
+if __name__ == "__main__":
+    main()
