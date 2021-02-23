@@ -1,0 +1,571 @@
+import SimpleITK as sitk
+import pandas as pd
+import numpy as np
+import os
+import sys
+import shutil
+import subprocess
+from functools import partial
+from tqdm import tqdm
+
+# We use the multiprocess package instead of the official 
+# multiprocessing as it currently has several issues as discussed
+# on the software carpentry page: https://hpc-carpentry.github.io/hpc-python/06-parallel/
+import multiprocess as mp
+import platform
+import hashlib
+import tempfile
+import pickle
+import time
+
+import sys
+import matplotlib.pyplot as plt
+import matplotlib.colors
+
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from PyQt5.QtCore import Qt, QObject, QRunnable, QThreadPool, QTimer, pyqtSignal, pyqtSlot
+from PyQt5.QtWidgets import QApplication, QLabel, QWidget, QMainWindow, QSlider, QVBoxLayout, QPushButton, QFileDialog, QProgressBar, QComboBox
+
+# OUTPUT_DIR = 'C:\\Users\\JBhat\\TUTORIAL\\output'
+# data_root_dir = 'C:\\Users\\JBhat\\TUTORIAL\\data'
+# Maximal number of parallel processes we run.
+MAX_PROCESSES = 15
+LENGTH = 0
+fil = 0
+
+# a sitk function that takes an image, converts it to greyscale
+
+def process_image(img, projection_axis, thumbnail_size):
+    """
+    Create a grayscale thumbnail image from the given image. If the image is 3D it is 
+    projected to 2D using a Maximum Intensity Projection (MIP) approach. Color images
+    are converted to grayscale, and high dynamic range images are window leveled using
+    a robust approach.
+
+    :param img:  A 2D or 3D grayscale or sRGB image.
+    :type img: SimpleITK.Image
+    :param projection_axis: The axis along which we project 3D images.
+    :type projection_axis: int in [0,2]
+    :param thumbnail_size: The 2D sizes of the thumbnail.
+    :type thumbnail_size: list/tuple(int)
+    :return res:  2D SimpleITK image (Resampled)
+    :rtype res: sitkUInt8 pixel 
+    """    
+    #2D image masquerading as 3D image
+    if img.GetDimension()==3 and img.GetSize()[2]==1: 
+        img = img[:,:,0]
+
+    #3D image projected along projection_axis direction
+    elif img.GetDimension() == 3: 
+        img = sitk.MaximumProjection(img,projection_axis)
+        slc = list(img.GetSize())
+        slc[projection_axis] = 0 
+        img = sitk.Extract(img,slc)
+
+    #sRGB image, convert to gray
+    if img.GetNumberOfComponentsPerPixel() == 3: 
+
+        # Convert sRGB image to gray scale and rescale results to [0,255]    
+        channels = [sitk.VectorIndexSelectionCast(img,i, sitk.sitkFloat32) for i in range(img.GetNumberOfComponentsPerPixel())]
+
+        #linear mapping
+        I = 1/255.0*(0.2126*channels[0] + 0.7152*channels[1] + 0.0722*channels[2])
+
+        #nonlinear gamma correction
+        I = I*sitk.Cast(I<=0.0031308,sitk.sitkFloat32)*12.92 + I**(1/2.4)*sitk.Cast(I>0.0031308,sitk.sitkFloat32)*1.055-0.55
+        img = sitk.Cast(sitk.RescaleIntensity(I), sitk.sitkUInt8)
+
+    else:
+        # To deal with high dynamic range images that also contain outlier intensities we use window-level intensity mapping and set the window:
+        # to [max(Q1 - w*IQR, min_intensity), min(Q3 + w*IQR, max_intensity)]
+        # IQR = Q3-Q1
+        # The bounds which should exclude outliers are defined by the parameter w, where 1.5 is a standard default value (same as used in box and
+        # whisker plots to define whisker lengths).
+        w=1.5
+        min_val,q1_val,q3_val,max_val = np.percentile(sitk.GetArrayViewFromImage(img).flatten(), [0,25,75,100])
+        min_max = [np.max([(1.0+w)*q1_val-w*q3_val, min_val]), np.min([(1.0+w)*q3_val-w*q1_val, max_val])]
+        wl_image = sitk.IntensityWindowing(img, windowMinimum=min_max[0], windowMaximum=min_max[1], outputMinimum=0.0, outputMaximum=255.0)
+        img = sitk.Cast(wl_image, sitk.sitkUInt8)
+    
+    res = sitk.Resample(img, size=thumbnail_size,
+                        transform=sitk.Transform(),interpolator=sitk.sitkLinear,
+                        outputOrigin = img.GetOrigin(), 
+                        outputSpacing = [(sz-1)*spc/(nsz-1) for nsz,sz,spc in zip(thumbnail_size, img.GetSize(), img.GetSpacing())],
+                        outputDirection = img.GetDirection(),
+                        defaultPixelValue=0,
+                        outputPixelType=img.GetPixelID())
+    res.SetOrigin([0,0])
+    res.SetSpacing([1,1])
+    res.SetDirection([1,0,0,1])
+    return res
+
+
+def visualize_single_file(file_name, imageIO, projection_axis, thumbnail_size):
+    """
+    This sitk function reads the Image file, sets the corressponding ImageIo according to Image type and then uses 
+    the previous 'process_image' function to convert it to a greyscale image
+
+    :param file_name: file or path to files
+    :type file_name: str
+    :param imageIO: SITK image IO set according to type of image
+    :type imageIO: str
+    :param projection_axis: The axis along which we project 3D images.
+    :type projection_axis: int in [0,2]
+    :param thumbnail_size: The 2D sizes of the thumbnail.
+    :type thumbnail_size: list/tuple(int)
+    :return (image_file_name, image): The new file name and the converted images are returned in the form of a tuple 
+    :rtype: tuple
+    """    
+
+    image_file_name = ''
+    image = None
+    try:
+        reader = sitk.ImageFileReader()
+        reader.SetImageIO(imageIO)
+        reader.SetFileName(file_name)
+        img = reader.Execute()
+        image = process_image(img, projection_axis, thumbnail_size)
+        image_file_name = file_name
+    except:
+        pass
+    return (image_file_name, image)
+
+
+def create_tile_volume(images, tile_size):
+    """
+    Create a faux-volume from a list of images. Each slice in the volume is constructed from tile_size[0]*tile_size[1] images. 
+    The slices are then joined to form the faux volume.
+
+    :param images: image list that we tile.
+    :type images: list(SimpleITK.Image(2D, sitkUInt8))
+    :param tile_size: Number of tiles to use in x and y.
+    :type tile_size: 2D tuple/list
+    :return sitk.JoinSeries(faux_volume): Volume comprised of tiled image slices. Order of tiles matches the order of the input list.
+    :rtype: SimpleITK.Image(3D, sitkUInt8)
+    """  
+
+    step_size = tile_size[0]*tile_size[1]
+    # @Mseise
+    #subj_tiles=[sitk.Tile(Images_subject_X_F01, tile_size, 0) for x in subject_lsit]
+    #faux_volume = np.vstack(subj_tiles[:9]),sitk.Tile(subj_tiles, (1,10))
+
+    faux_volume = [sitk.Tile(images[i:i+step_size], tile_size, 0) for i in range(0, len(images), step_size)]
+    #if last tile image is smaller than others, add background content to match the size
+    if len(faux_volume)>1 and \
+       (faux_volume[-1].GetHeight()!=faux_volume[-2].GetHeight() or faux_volume[-1].GetWidth()!=faux_volume[-2].GetWidth()):
+        img = sitk.Image(faux_volume[-2])*0
+        faux_volume[-1] = sitk.Paste(img, faux_volume[-1], faux_volume[-1].GetSize(), [0,0], [0,0])       
+    return sitk.JoinSeries(faux_volume)
+
+def visualize_files(root_dir, imageIO='', projection_axis=1, thumbnail_size=[64,64], tile_size=[20,20]):
+    """
+    This function traverses the directory structure reading all user selected images (selection based on the image file format specified by the caller). 
+    All images are converted to 2D grayscale in [0,255] as follows:
+    * Images with three channels are assumed to be in sRGB color space and converted to grayscale.
+    * Grayscale images are window-levelled using robust values for the window-level accomodating for outlying intensity values.
+    * 3D images are converted to 2D using maximum intensity projection along the user specified projection axis.  
+
+    :param root_dir: Path to the root of the data directory. Traverse the directory structure and tries to read every file as an image using the given imageIO.
+    :type root_dir: str
+    :param imageIO: Name of image IO to use. The empty string indicates to read all file formats supported by SimpleITK., defaults to ''
+                    To see the list of registered image IOs use the ImageFileReader::GetRegisteredImageIOs() or print an ImageFileReader.
+    :type imageIO: str, optional
+    :param projection_axis:3D images are converted to 2D using mean projection along the specified axis., defaults to 2
+    :type projection_axis: int in [0,2], optional
+    :param thumbnail_size:  The size of the 2D image tile used for visualization., defaults to [64,64]
+    :type thumbnail_size: 2D tuple/list, optional
+    :param tile_size: Number of tiles to use in x and y., defaults to [20,20]
+    :type tile_size: 2D tuple/list, optional
+    :return (faux_volume, image_file_names): Faux_volume comprised of tiles, file_name_list corrosponding to the image tiles.
+                                                The SimpleITK image contains the meta-data 'thumbnail_size' and 'tile_size'.
+    :rtype: tuple(SimpleITK.Image, list)
+    """    
+
+    image_file_names = []
+    faux_volume = None
+    images = []
+
+    all_file_names = []
+    for dir_name, subdir_names, file_names in os.walk(root_dir):
+        all_file_names += [os.path.join(os.path.abspath(dir_name), fname) for fname in file_names]
+
+    global LENGTH
+    LENGTH = len(all_file_names)
+    print(LENGTH)
+
+    if platform.system() == 'Windows':
+        res = map(partial(visualize_single_file,
+                          imageIO=imageIO, 
+                          projection_axis=projection_axis, 
+                          thumbnail_size=thumbnail_size), all_file_names)
+    else:
+        with mp.Pool(processes=MAX_PROCESSES) as pool:
+            res = pool.map(partial(visualize_single_file,
+                                   imageIO=imageIO, 
+                                   projection_axis=projection_axis, 
+                                   thumbnail_size=thumbnail_size), all_file_names)
+    res = [data for data in res if data[1] is not None]
+    if res:
+        image_file_names, images = zip(*res)
+        if image_file_names:
+            faux_volume = create_tile_volume(images, tile_size)
+            faux_volume.SetMetaData('thumbnail_size', ' '.join([str(v) for v in thumbnail_size]))
+            faux_volume.SetMetaData('tile_size', ' '.join([str(v) for v in tile_size]))
+    return (faux_volume, image_file_names)
+
+
+class Canvas(FigureCanvas):
+    """
+    A class to represent the layer over which the faux image volume is drawn
+
+    :param FigureCanvas: Original parent matplotlib class 
+    :type FigureCanvas: Class
+    """    
+    def __init__(self, parent, tiled_faux_vol, image_files_list, index, selection_func=None, figure_size=(8, 8)):
+        # Create a figure.
+        self.fig, self.axes = plt.subplots(1, 1, figsize=figure_size)
+        super().__init__(self.fig)
+        self.setParent(parent)
+
+        self.tiled_faux_vol = tiled_faux_vol
+        self.thumbnail_size = [int(v) for v in self.tiled_faux_vol.GetMetaData('thumbnail_size').split()]
+        self.tile_size = [int(v) for v in self.tiled_faux_vol.GetMetaData('tile_size').split()]        
+        self.npa = sitk.GetArrayViewFromImage(self.tiled_faux_vol)
+        self.point_indexes = []
+        self.selected_image_indexes = []
+        self.image_files_list = image_files_list
+        self.selection_func = selection_func
+        self.index = index
+
+
+        ### Matplotlib code goes here  ####
+
+        # Connect the mouse button press to the canvas (__call__ method is the invoked callback).
+        self.fig.canvas.mpl_connect('button_press_event', self)
+
+        # Display the data and the controls, first time we display the image is outside the "update_display" method
+        # as that method relies on the previous zoom factor which doesn't exist yet.
+        if fil == 0:
+            self.axes.imshow(self.npa[self.index,:,:], cmap=plt.cm.Greys_r)
+            self.fig.tight_layout()
+        else:
+            self.axes.imshow(self.npa[self.index,:,:], cmap=fil)
+            self.fig.tight_layout()            
+        
+
+        
+    def __call__(self, event):
+        """
+        __call__ [summary]
+
+        :param event: signal
+        :type event: 
+        """        
+        if event.inaxes==self.axes:
+            x = int(round(event.xdata))
+            y = int(round(event.ydata))
+            z = self.index
+            image_index = z * self.tile_size[0]*self.tile_size[1] + int(y/self.thumbnail_size[1])*self.tile_size[0] + int(x/self.thumbnail_size[0])
+            print(x)
+            print(y)
+            print(z)
+            print(self.thumbnail_size)
+            print(self.tile_size)
+            print(image_index)
+            if image_index<len(self.image_files_list):
+                #If new selection add it, otherwise just redisplay the image by calling Show.
+                if image_index not in self.selected_image_indexes:
+                    self.point_indexes.append((event.xdata, event.ydata)) 
+                    self.selected_image_indexes.append(image_index)
+                    
+                if self.selection_func:
+                    self.selection_func(self.image_files_list[image_index])
+
+    # def get_selected_images(self):
+    #     return [self.image_files_list[index] for index in self.selected_image_indexes]
+
+
+
+def show_image(image_file_name):
+    """
+    show_image [summary]
+
+    :param image_file_name: [description]
+    :type image_file_name: [type]
+    """    
+    if isinstance(image_file_name, str):
+        img = sitk.ReadImage(image_file_name)
+        
+    else:
+        # As the files comprising a DICOM series with multiple files can reside in 
+        # separate directories and SimpleITK expects them to be in a single directory 
+        # we use a tempdir and symbolic links to enable SimpleITK to read the series as
+        # a single image.
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            if platform.system() == 'Windows':
+                for i, fname in enumerate(image_file_name):
+                    shutil.copy(os.path.abspath(fname),
+                            os.path.join(tmpdirname,str(i)))
+            else:
+                for i, fname in enumerate(image_file_name):
+                    os.symlink(os.path.abspath(fname),
+                            os.path.join(tmpdirname,str(i)))                
+            img = sitk.ReadImage(sitk.ImageSeriesReader_GetGDCMSeriesFileNames(tmpdirname))
+    sitk.Show(img)
+    print(image_file_name)
+
+
+
+class NewWindow(QWidget):
+    """
+    NewWindow [summary]
+
+    :param QWidget: [description]
+    :type QWidget: [type]
+    """    
+    def __init__(self, faux_volume_image_files, image_file_list, index):
+        super().__init__()
+        chart1 = Canvas(self, faux_volume_image_files, image_file_list, index, selection_func=show_image)
+
+
+class MainWindow(QMainWindow):
+    """
+    MainWindow [summary]
+
+    :param QMainWindow: [description]
+    :type QMainWindow: [type]
+    """    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+        self.dictF = {
+            'gray_r' : plt.cm.gray_r,
+            'jet_r' : plt.cm.jet_r,
+            'Blues_r' : plt.cm.Blues_r,
+            'Spectral_r' : plt.cm.Spectral_r,
+            'Paired_r' : plt.cm.Paired_r,
+            'coolwarm_r' : plt.cm.coolwarm_r,
+            'binary_r' : plt.cm.binary_r, 
+            'rainbow_r' : plt.cm.rainbow_r,
+            'RdBu_r' : plt.cm.RdBu_r,
+            'Reds' : plt.cm.Reds,
+            'Blues' : plt.cm.Blues,
+            'Greens' : plt.cm.Greens, 
+            'Greys' : plt.cm.Greys,
+        }
+        
+        self.setWindowTitle("Python Image Test and Verification App")
+
+        # Set the layout - vertical Layout
+        layout = QVBoxLayout()
+
+        self.progress = QProgressBar()
+
+        # Push button for selecting directory - opens new window for browsing directory
+        self.pb1 = QPushButton()
+        self.pb1.setObjectName("FileSelect")
+        self.pb1.setText("Select Image File")
+        self.pb1.setGeometry(300, 200, 500, 100)
+        data_roor_dir = self.pb1.clicked.connect(self.SelectImageFilename)
+        self.pb1.clicked.connect(self.execute)
+
+
+        # ComboBox containing different filters from cmap
+
+        self.dropdown = QComboBox()
+        self.dropdown.addItems(self.dictF)
+
+        self.dropdown.currentTextChanged.connect(self.Text_changed)
+
+        # Slider for specificing index parameter used for the view selection
+        slider_widget = QSlider(Qt.Horizontal)
+        slider_widget.setRange(0, 20)
+        slider_widget.setSingleStep(1)
+        slider_widget.setTickInterval(1)
+        slider_widget.sliderMoved.connect(self.slider_position)
+        slider_widget.valueChanged.connect(self.value_changed)
+
+        # Push button to create the faux volume
+        self.button = QPushButton("Montage")
+        
+        
+        # Adding the widgets to the layout
+        layout.addWidget(self.pb1)
+        layout.addWidget(self.progress)
+        # layout.addWidget(self.pb2)
+        layout.addWidget(self.dropdown)
+        layout.addWidget(slider_widget)
+        layout.addWidget(self.button)
+        
+
+        # Creating a separate widget that holds the layout  and passing it on to the central widget
+        widget = QWidget()
+        widget.setLayout(layout)
+        self.setCentralWidget(widget)
+
+        # initializing thread manager
+        self.threadpool = QThreadPool()
+        print("Multithreading with maximum %d threads" % self.threadpool.maxThreadCount())
+    
+    def Text_changed(self, s):
+        global fil
+        fil = self.dictF[s]
+        print(f'New filter {fil}')
+
+
+    def show_new_window(self, checked):
+        """
+        This function simply shows the new window object created earlier
+
+        :param checked: TBD
+        :type checked: TBD
+        """        
+        self.w.show()
+
+
+    def value_changed(self, i):
+        """
+        Detects a change in the value of the slider. Captures this event's signal as i.
+        Handles the exception of the index error thereby preventing the program to crash prematurely
+
+        :param i: Current value of the slider position
+        :type i: int
+        """
+        try:
+            self.update_w = NewWindow(faux_volume_image_files, image_file_list, i)
+            self.button.clicked.connect(self.next_new_window)
+        except IndexError:
+            print("Slider limit reached. All images covered")
+            
+
+    def next_new_window(self):
+        """
+        Displays the latest object created from the NewWindow Class.
+        """        
+        self.update_w.show()
+
+
+    def slider_position(self, p):
+        """
+        Qt slot that captures the current position of the slider signal and returns it
+
+        :param p: current slider position obtained from signal 'sliderMoved.connect()
+        :type p: int
+        :return: current slider position obtained from signal 'sliderMoved.connect()
+        :rtype: int
+        """        
+        print(p)
+        return p
+
+
+    def SelectImageFilename(self):
+        """
+        Opens a dialog asking the user to select the source path containing the images.
+
+        :return: input directory in the form of windows compliant directory style
+        :rtype: str
+        """        
+        options = QFileDialog.Options()
+        options |= QFileDialog.DontUseNativeDialog
+        fileName = QFileDialog.getExistingDirectory(self,"Select Path to Image Folder", options=options)
+        if fileName:    
+            self.execute()        
+            Path = fileName
+            name_list = fileName.split('/')
+            newPath = '\\\\'.join(name_list)
+            print(newPath)
+        
+        self.VisualizeFiles(newPath)
+
+    def VisualizeFiles(self, path):
+        """
+        Calls the Sitk visualize files function after the input directory is obtained from SelectImageFilename function 
+
+        :param path: Input path obtained from SelectImageFilename function
+        :type path: str
+        """
+        
+        global faux_volume_image_files
+        global image_file_list
+        tic = time.perf_counter()
+        print(tic)
+        ##@MSEISE changes with thumbnail size and tile size
+        faux_volume_image_files, image_file_list = visualize_files(path, imageIO = '', projection_axis=2, thumbnail_size=[128, 128], tile_size=[10, 10])
+        toc = time.perf_counter()
+        print(toc)
+        print(toc-tic)
+        self.w = NewWindow(faux_volume_image_files, image_file_list, 0)
+        self.button.clicked.connect(self.show_new_window)
+
+    def execute(self):
+        """
+        execute [summary]
+        """        
+        worker = Worker()
+        worker.signals.progress.connect(self.update_progress)
+        self.threadpool.start(worker)
+
+
+    def update_progress(self, progress):
+        """
+        update_progress [summary]
+
+        :param progress: [description]
+        :type progress: [type]
+        """        
+        self.progress.setValue(progress)
+
+
+
+class WorkerSignals(QObject):
+    """
+    Defines the signals available from a running worker thread.
+    progress
+        int progress complete,from 0-100
+    """
+    progress = pyqtSignal(int)
+
+
+class Worker(QRunnable):
+    """
+    Worker thread
+
+    Inherits from QRunnable to handle worker thread setup, signals
+    and wrap-up.
+    """ 
+    def __init__(self):
+        super().__init__()
+        self.signals = WorkerSignals()
+
+    # @pyqtSlot
+    def run(self):
+        # while LENGTH == 0:
+        #     if LENGTH > 0:
+        #         break
+        total_n = 1
+        print(LENGTH)
+        print(total_n)
+
+        for n in tqdm(range(total_n)):
+            progress_pc = int(100 * float(n + 1) / total_n)
+
+            # Progress 0-100% as int
+            self.signals.progress.emit(progress_pc)
+            time.sleep(0.0000001)
+                        
+
+# tic = time.perf_counter()
+# print(tic)
+app = QApplication(sys.argv)
+window = MainWindow()
+# toc = time.perf_counter()
+# print(toc)
+# print(toc-tic)
+window.show()
+sys.exit(app.exec_())
+
+
+
+
+        
+
