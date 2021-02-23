@@ -1,0 +1,228 @@
+import sys
+import json
+#from pathlib import Path
+
+from PyQt5.QtWidgets import QApplication, QWidget, QDialog, QVBoxLayout, QHBoxLayout  
+from PyQt5.QtWidgets import QInputDialog, QFileDialog, QDockWidget
+from PyQt5.QtWidgets import QPushButton, QLineEdit, QMainWindow, QMessageBox, QRadioButton, QGroupBox
+from PyQt5.QtGui import QIcon, QFont
+from PyQt5.QtCore import QSize
+
+class Window(QMainWindow):
+    """
+    Qt Main window class over which other objects get layed onto
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.main_dialog = Form(self)
+        self.setCentralWidget(self.main_dialog)
+        self.init_UI()
+
+    def init_UI(self):
+        self.statusbar = self.statusBar()
+        self.statusbar.showMessage('Ready')    
+
+        self.setWindowTitle("Create Json File")
+        self.show()
+
+
+class Form(QWidget):
+    """
+    A class that is inherited from QDialog superclass
+    """ 
+
+    def __init__(self, parent):
+
+        super().__init__(parent)
+        self.parent = parent
+        self.create_radiobutton()
+
+        self.pb1 = QPushButton()
+        self.pb1.setObjectName("FileSelect")
+        self.pb1.setText("Select Image File")
+        self.pb1.setGeometry(300, 200, 500, 100)
+        self.pb1.clicked.connect(self.SelectImageFilename)
+
+        layout = QVBoxLayout()
+        layout.addWidget(self.groupbox)
+        layout.addWidget(self.pb1)
+        self.setLayout(layout)
+
+        
+
+    def create_radiobutton(self):
+        self.groupbox = QGroupBox("Please specify how the images must be grouped and presented")
+        self.groupbox.setFont(QFont("Sanserif", 10))
+
+        vbox = QVBoxLayout()
+
+        self.radio1 = QRadioButton("One Image per view")    ## ***************** CREATE RADIO WIDGET  1
+        self.radio1.setFont(QFont("Sanserif", 10))
+        self.radio1.toggled.connect(self.on_selected)
+
+        self.radio2 = QRadioButton("Show all sides of each subject per day") ## ***************** CREATE RADIO WIDGET 2
+        self.radio2.setFont(QFont("Sanserif", 10))
+        self.radio2.toggled.connect(self.on_selected)
+
+        self.radio3 = QRadioButton("Show all days of each subject per side") ## *****************CREATE RADIO WIDGET 3
+        self.radio3.setFont(QFont("Sanserif", 10))
+        self.radio3.toggled.connect(self.on_selected)
+         
+        self.radio4 = QRadioButton("Show all sides and all days for each subject") ## *****************CREATE RADIO WIDGET 4
+        self.radio4.setFont(QFont("Sanserif", 10))
+        self.radio4.toggled.connect(self.on_selected)
+
+        
+        vbox.addWidget(self.radio1) ##............................ADD WIDGET to hlayout
+        vbox.addWidget(self.radio2) ##............................ADD WIDGET to hlayout
+        vbox.addWidget(self.radio3) ##............................ADD WIDGET to hlayout
+        vbox.addWidget(self.radio4) ##............................ADD WIDGET to hlayout
+
+        self.groupbox.setLayout(vbox)
+
+
+    def on_selected(self):
+        radio_button = self.sender()
+
+        if radio_button.isChecked():
+            global temp_radio
+            temp_radio = radio_button.text()
+            print(temp_radio)
+
+
+    def SelectImageFilename(self):
+        """
+        Opens up a file explorer allowing user to select image
+        """        
+
+        options = QFileDialog.Options()
+        options |= QFileDialog.DontUseNativeDialog
+        fileName, _ = QFileDialog.getOpenFileName(self,"Select ImageFile for Json creation", "","Image Files(*.tif *.cr2 *.png *.jpg);; Json Files(*.json)", options=options)
+        ImagePath = fileName
+        name_list = fileName.split('/')
+        print(name_list)
+        ImageName = name_list[-1]
+        ImageType = "*" + ImageName[-4:]
+        self.CreateJsonFile(ImageName, ImagePath, ImageType)
+        
+    def take_care_of_path(self, imagepath, imgname):
+        """
+        Adjusts pathname to Win OS path naming system  and removes image name from path
+
+        :param imagepath: oldpath
+        :type imagepath: str
+        :param imgname: filename of image
+        :type imgname: str
+        :return: new adjusted pathname
+        :rtype: str
+        """        
+
+        path_list = imagepath.split('/')
+        path_list.remove(imgname)
+        newimgpath = '\\'.join(path_list)
+        return newimgpath
+
+
+    def CreateJsonFile(self, imgname, imgpath, imgtype):
+        """
+        Creates a new json file with number of contours, contour names, path and imagetypes adjusted according to study type 
+
+        :param imgname: filename of image
+        :type imgname: str
+        :param imgpath: filepath of image
+        :type imgpath: str
+        :param imgtype: type of image file (ex: .jpg, .png etc.)
+        :type imgtype: str
+        """        
+
+        print(imgname + '\n', imgpath + '\n', imgtype + '\n')
+
+        # Convert Path to current operating system style
+        inoutPath = self.take_care_of_path(imgpath, imgname)
+        print(inoutPath)
+
+        if 'NEWT' in imgname:
+            from Templates_dict_noImports import dictNEWT
+
+            self.repeating_tasks(imgname, inoutPath, dictNEWT, imgtype)
+        
+        elif 'DRM' in imgname:
+            from Templates_dict_noImports import dictDRM
+
+            self.repeating_tasks(imgname, inoutPath, dictDRM, imgtype)
+
+
+        elif 'HIR' in imgname:
+            from Templates_dict_noImports import dictHIR
+
+            self.repeating_tasks(imgname, inoutPath, dictHIR, imgtype)
+
+        elif 'FTO' in imgname:
+            from Templates_dict_noImports import dictFTO
+
+            self.repeating_tasks(imgname, inoutPath, dictFTO, imgtype)
+
+    def repeating_tasks(self, imgname_var, inoutPath_var, imported_dict, imgtype_var):
+        """
+        A function that wraps repeating tasks such as adjustments to dictionary name, appending json extension to filename, 
+                file creation and filename status bar completion message. For imporving code readability.
+
+        :param imgname_var: input filename after correction
+        :type imgname_var: str
+        :param inoutPath_var: path where the file exists
+        :type inoutPath_var: str
+        :param imported_dict: dictionary imported from template
+        :type imported_dict: dict
+        :param imgtype_var: file extension to be modified in imported dictionary parameter TYPE
+        :type imgtype_var: str
+        """        
+            
+        # Append .json to filename
+        json_fname = inoutPath_var + '\\' + imgname_var + '.json'
+        
+        # Adjust path and img type in imported dict template
+        adj_dict = self.dict_adj(imported_dict, inoutPath_var, imgtype_var, temp_radio)
+
+        # Create the .json file 
+        with open(json_fname, 'w') as f:
+            json.dump(adj_dict, f, indent=4, separators=(", ", ": "))
+
+        self.parent.statusbar.showMessage('File created successfully, CLOSE window')
+
+
+    def dict_adj(self, adjdict, iopath, imgtype, temp_radio):      
+        """
+        Replaces specefic keywords in input dictionary according to study, filename and path requirements 
+
+        :param adjdict: input dictionary
+        :type adjdict: dict
+        :param iopath: adjusted path 
+        :type iopath: str
+        :param imgtype: image name with extension appended
+        :type imgtype: str
+        :return: dictionary ready for json conversion
+        :rtype: dict
+        """              
+
+        adjdict["InputDirectory"] = iopath
+        adjdict["OutputDirectory"] = iopath
+        adjdict["InputFileNames"] = [imgtype]
+
+        if temp_radio == 'One Image per view':
+            adjdict["InputFileCorrespondencesIndex"] = []
+        elif temp_radio == 'Show all sides of each subject per day':
+            adjdict["InputFileCorrespondencesIndex"] = [1]
+        elif temp_radio == 'Show all days of each subject per side':
+            adjdict["InputFileCorrespondencesIndex"] = [2]
+        elif temp_radio == 'Show all sides and all days for each subject':    
+            adjdict["InputFileCorrespondencesIndex"] = [1, 2]
+
+        return adjdict
+
+    
+app = QApplication(sys.argv)
+win = Window()
+sys.exit(app.exec_())
+
+
