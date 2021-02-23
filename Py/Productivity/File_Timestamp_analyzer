@@ -1,0 +1,100 @@
+import os
+import time
+import datetime
+import matplotlib.pyplot as plt 
+import pandas as pd
+import shutil
+import mplcursors
+
+from bokeh.plotting import figure, output_file, show
+
+folder = "D:\\Archive\\Test\\102EOS5D"
+
+## path choices/examples
+# folder = "D:\\Archive\\Test\\101EOS5D"
+# folder = "D:\\Archive\\Test\\102EOS5D"
+
+#"C:\\JB_HomeOffice\\Coding_Projekts\\JB_py\\Dev_project4_File_Timestamp_Visualizer\\Test_images"
+
+
+# merges the image filenmae with the main directory path
+filepaths = [os.path.join(folder, f) for f in os.listdir(folder)]
+print(filepaths)
+
+
+delta_list = []
+outlier_list = []
+D_outlier_list = []
+filenamelist = [f for f in os.listdir(folder)]
+
+for i in range(len(filepaths)-1):
+    stat_current = os.stat(filepaths[i])
+    fctime_current = datetime.datetime.fromtimestamp(stat_current.st_ctime)
+    
+    if i == 0:
+        fctime_previous = fctime_current
+        print(fctime_previous)
+        print(fctime_current)
+        delta = fctime_current - fctime_previous
+        print(delta)
+        delta_list.append(delta)
+        continue
+    print(fctime_previous)
+    print(fctime_current)
+    delta = fctime_current - fctime_previous
+    fctime_previous = fctime_current
+    print(filepaths[i], delta)
+    delta_list.append(delta)
+
+    # separating the days:
+    if delta > datetime.timedelta(minutes=5):  
+        if delta >= datetime.timedelta(hours=10):
+            continue
+        D_outlier_list.append(delta)
+        outlier_list.append(filepaths[i])
+        # filepaths.remove(filepaths[i]) ## Uncomment only if certain that the files being removed are the outlier files
+    
+
+
+# Combine the file names with the time difference values(for printing/logging purposes; called as separate function later)
+res_out = list(zip(D_outlier_list, outlier_list))
+
+
+# Moving outlier images to newly created folder for further analysis
+stdpath = os.getcwd()
+print(f"The current working directory is: {stdpath}")
+path = os.path.join(stdpath, 'out2')
+print(f"The newly created folder lies on the path: {path}")
+
+# create a new folder
+if not os.path.exists(path):
+    os.makedirs(path)
+
+
+# Show the ctime time series for further analysis
+filenamelist_new = filenamelist[1:]
+# filenamelist_short = [x[4:8] for x in filenamelist_new]
+data_set = pd.DataFrame(delta_list, index=filenamelist_new)
+# print(data_set)
+# fig, ax = plt.subplots()
+plt.plot(data_set, color='red', marker='x', markersize=0.7, linewidth=0.3, linestyle='dashed')
+plt.xticks(rotation='vertical', ticks=filenamelist_new, fontsize=8)
+mplcursors.cursor()
+plt.show()
+
+# Move selected files to a separate folder
+for outlier in outlier_list:
+    print(outlier)
+    shutil.copy(outlier, path)
+
+# create a log file with list of filenames filtered out
+f = open(os.path.join(path, "files_outlier.log") , "w+")
+for x, y in res_out:
+    f.write(f"{x}, {y}")
+    f.write("\n")
+f.close()
+
+# print(delta_list)
+# res = list(zip(filenamelist, delta_list))
+# for x, y in res:
+#     print (x,y)
