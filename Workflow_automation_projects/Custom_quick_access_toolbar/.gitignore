@@ -1,0 +1,20 @@
+# Pixi environment
+.pixi/
+
+# Runtime user config — contains local absolute paths
+quickdrop_config.json
+quickdrop_config.json.tmp
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
