@@ -1,0 +1,29 @@
+# pixi environments
+.pixi/*
+!.pixi/config.toml
+
+# secrets
+.env
+
+# python
+__pycache__/
+*.pyc
+
+# analyzer input
+resume/
+job_postings/
+
+# analyzer output
+output/
+output_/
+data/
+
+# IDE / tool settings
+.claude
+
+# Privacy sanitizer outputs
+purge_report.md
+documentation_report.md
+refactoring_report.md
+implementation_plan.md
+

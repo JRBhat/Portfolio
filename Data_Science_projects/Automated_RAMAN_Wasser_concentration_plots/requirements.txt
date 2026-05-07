@@ -1,0 +1,6 @@
+# Runtime dependencies for the Raman water-concentration heatmap pipeline
+pandas
+numpy
+matplotlib
+scipy
+openpyxl

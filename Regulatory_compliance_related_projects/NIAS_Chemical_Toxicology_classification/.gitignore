@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+
+# Secrets
+.env
+*.env
+*.key
+
+# Database / data files
+*.xlsx
+*.xls
+*.db
+*.sqlite
+data/
+
+# PyInstaller compiled output
+source/dist/
+
+# Superseded code
+source/superseded/
+
+# Privacy sanitizer outputs
+purge_report.md
+documentation_report.md
+refactoring_report.md
+implementation_plan.md

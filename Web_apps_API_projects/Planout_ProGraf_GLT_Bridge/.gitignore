@@ -1,0 +1,36 @@
+# Secrets and environment config — MUST stay local, never commit
+.env
+*.env
+*.key
+*.pem
+secrets.yaml
+secrets.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+
+# Runtime outputs (may contain real scheduling data)
+output_from_sql_queries/
+*.txt
+*.tsv
+
+# Superseded / archive versions
+super/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Privacy sanitizer outputs
+purge_report.md
+documentation_report.md
+refactoring_report.md
+implementation_plan.md
+

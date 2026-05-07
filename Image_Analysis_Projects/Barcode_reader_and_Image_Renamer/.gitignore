@@ -1,0 +1,30 @@
+# Secrets
+.env
+*.env
+*.key
+*.pem
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+
+# Input image data and outputs
+data/
+bin/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Privacy sanitizer outputs
+purge_report.md
+documentation_report.md
+refactoring_report.md
+implementation_plan.md
+

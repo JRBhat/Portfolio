@@ -1,0 +1,29 @@
+# ── Virtual environment (pixi) ────────────────────────────────────────────────
+.pixi/
+
+# ── Python bytecode ───────────────────────────────────────────────────────────
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# ── Runtime-generated tracker files ──────────────────────────────────────────
+# These are stored in %APPDATA%\WorkTimeObserver\ at runtime (outside the repo)
+# but listed here as a safeguard in case they are ever produced locally.
+activity.db
+tracker.pid
+tracker.stop
+*.db
+
+# ── OS / editor artifacts ─────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# ── Privacy sanitizer outputs ─────────────────────────────────────────────────
+purge_report.md
+documentation_report.md
+refactoring_report.md
+implementation_plan.md
+

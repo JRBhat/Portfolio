@@ -1,0 +1,23 @@
+# pixi environments
+.pixi/*
+!.pixi/config.toml
+
+# User-generated data (contains personal job search history)
+job_skills_data.json
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/settings.json
+.idea/

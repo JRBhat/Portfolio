@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+
+# Image data (large binary sample files — not for version control)
+data/
+data/sample_images/
+*.tif
+*.TIF
+*.tiff
+
+# Privacy sanitizer outputs
+purge_report.md
+documentation_guide.md
+implementation_plan.md
+refactoring_report.md

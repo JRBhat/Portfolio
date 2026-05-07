@@ -1,0 +1,38 @@
+# Secrets and environment config — MUST stay local, never commit
+.env
+*.env
+*.key
+*.pem
+secrets.yaml
+secrets.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+
+# pixi package manager environment
+.pixi/
+
+# Runtime outputs (may contain real study data)
+*.xlsx
+*.log
+
+# Superseded / archive versions
+superseded/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Privacy sanitizer outputs
+purge_report.md
+documentation_report.md
+implementation_plan.md
+refactoring_report.md
+

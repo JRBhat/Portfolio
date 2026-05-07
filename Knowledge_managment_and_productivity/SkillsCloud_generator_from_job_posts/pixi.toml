@@ -1,0 +1,13 @@
+[workspace]
+authors = ["Jayesh Bhat <jayesh.r.bhat@gmail.com>"]
+channels = ["conda-forge"]
+name = "Wordcloud_for_job_postings"
+platforms = ["win-64"]
+version = "0.1.0"
+
+[tasks]
+
+[dependencies]
+python = ">=3.14.2,<3.15"
+wordcloud = ">=1.9.6,<2"
+pytest = ">=9.0.3,<10"

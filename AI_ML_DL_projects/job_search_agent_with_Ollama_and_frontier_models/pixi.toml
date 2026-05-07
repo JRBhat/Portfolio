@@ -1,0 +1,24 @@
+[workspace]
+authors = ["Your Name <your@email.com>"]
+channels = ["conda-forge"]
+name = "job_search"
+platforms = ["win-64"]
+version = "0.1.0"
+
+[dependencies]
+python = ">=3.11"
+
+[pypi-dependencies]
+anthropic = ">=0.40.0"
+openai = ">=1.0.0"
+pdfplumber = ">=0.11.0"
+rich = ">=13.0.0"
+python-dotenv = ">=1.0.0"
+requests = ">=2.31.0"
+beautifulsoup4 = ">=4.12.0"
+
+[tasks]
+analyze = { cmd = "python analyzer.py", description = "Run analyzer (pass args after --)" }
+list = { cmd = "python analyzer.py --list", description = "List available resumes" }
+stats = { cmd = "python analyzer.py --stats", description = "Show aggregated skill stats" }
+batch = { cmd = "python batch_analyze.py", description = "Batch analyze all job postings" }

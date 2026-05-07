@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pyw
+*.pyz
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+
+# Image data (large binary files — not for version control)
+data/raw/
+data/processed/
+data/masks/
+*.tif
+*.TIF
+*.tiff
+*.TIFF
+
+# Log files
+*.log
+*.bck
+
+# Shelve temp files (created by ImageClasses.py at runtime)
+ImageClassShelve*/
+
+# Temp pyramid cache (created by ImagePyramideClass at runtime)
+*_pyramide_*.png
+*_pyramide_upscale_*.png
+
+# Privacy sanitizer outputs
+purge_report.md
+documentation_report.md
+refactoring_report.md
+implementation_plan.md
+
+# Image analysis internal library
+ImageAnalysis/

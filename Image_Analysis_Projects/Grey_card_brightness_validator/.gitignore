@@ -1,0 +1,39 @@
+# Secrets and environment config
+.env
+*.env
+*.key
+*.pem
+secrets.yaml
+secrets.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+
+# Study image data (never commit subject images or study files)
+data/
+*.jpg
+*.JPG
+*.cr2
+*.CR2
+*.tif
+*.tiff
+plot_log.txt
+group_whitest3.log
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Privacy sanitizer outputs
+purge_report.md
+documentation_report.md
+refactoring_report.md
+implementation_plan.md
+

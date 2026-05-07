@@ -1,0 +1,43 @@
+# Secrets and environment config
+.env
+*.env
+*.key
+*.pem
+secrets.yaml
+secrets.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+
+# Project runtime artifacts
+bin/organization_logo.jpg
+bin/*.icm
+bin/*.icc
+*.pickle
+*.pkl
+
+# Study data (never commit patient/subject images or study files)
+data/
+*.tex
+*.pdf
+output/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Superseded / archive
+source/super/
+
+# Privacy sanitizer outputs
+purge_report.md
+documentation_report.md
+implementation_plan.md
+refactoring_report.md
